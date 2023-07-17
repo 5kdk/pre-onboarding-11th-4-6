@@ -1,8 +1,10 @@
-# Week 4
+# 👨‍💻 원티드 프리온보딩 인턴십 최종과제
 
-<div align="center">
-  <img width="480" alt="원티드 프리온보딩 인턴십" src="https://github.com/5kdk/pre-onboarding-11th-4-6/assets/86090355/c77d66f1-df1b-458f-a720-893abf075680">
+<div align='center'>
+<img width='720' src='https://github.com/5kdk/pre-onboarding-11th-4-6/assets/86090355/9bba452e-17b9-44ff-b3ee-4bc2a39db527' >
 </div>
+
+<br/>
 
 ## 프로젝트 개요
 
