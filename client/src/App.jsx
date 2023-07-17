@@ -18,6 +18,7 @@ const router = createBrowserRouter([
 const App = () => (
   <MantineProvider
     theme={{
+      fontFamily: 'Spoqa Han Sans Neo, sans-serif',
       globalStyles: () => ({
         '*, *::before, *::after': {
           boxSizing: 'border-box',
