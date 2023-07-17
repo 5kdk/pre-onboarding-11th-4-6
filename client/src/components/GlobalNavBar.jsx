@@ -3,21 +3,13 @@ import logo from '../assets/logo.svg';
 
 const GlobalNavBar = () => (
   <Header withBorder={false}>
-    <Flex maw={1000} m={'auto'} px={20} align={'center'} justify={'space-between'}>
+    <Flex maw={1040} h={56} m="auto" px={20} align="center" justify="space-between">
       <Image src={logo} maw={126} />
-      <Flex fw={700}>
-        <Text px={'lg'} py={'md'}>
-          소개
-        </Text>
-        <Text px={'lg'} py={'md'}>
-          질문과 답변
-        </Text>
-        <Text px={'lg'} py={'md'}>
-          소식받기
-        </Text>
-        <Text px={'lg'} py={'md'}>
-          제휴/문의
-        </Text>
+      <Flex fw={500}>
+        <Text px="xl">소개</Text>
+        <Text px="xl">질문과 답변</Text>
+        <Text px="xl">소식받기</Text>
+        <Text px="xl">제휴/문의</Text>
       </Flex>
     </Flex>
   </Header>
