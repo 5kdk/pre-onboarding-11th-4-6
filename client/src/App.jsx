@@ -27,6 +27,7 @@ const App = () => (
           margin: 0,
           padding: 0,
         },
+        primaryColor: '#007BE9',
       }),
     }}>
     <RouterProvider router={router} />
