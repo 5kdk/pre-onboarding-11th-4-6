@@ -14,6 +14,12 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   settings: {
     react: { version: '18.2' },
+    'import/resolver': {
+      node: {
+        paths: ['src'],
+        extensions: ['.js', '.jsx'],
+      },
+    },
   },
   plugins: ['react-refresh'],
   rules: {
