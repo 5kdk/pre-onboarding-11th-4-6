@@ -1,8 +1,8 @@
-import { Flex, Header, Image, Text } from '@mantine/core';
+import { Flex, Header as MantineHeader, Image, Text } from '@mantine/core';
 import logo from '../assets/logo.svg';
 
-const GlobalNavBar = () => (
-  <Header withBorder={false}>
+const Header = () => (
+  <MantineHeader withBorder={false}>
     <Flex maw={1040} h={56} m="auto" px={20} align="center" justify="space-between">
       <Image src={logo} maw={126} />
       <Flex fw={500}>
@@ -12,6 +12,6 @@ const GlobalNavBar = () => (
         <Text px="xl">제휴/문의</Text>
       </Flex>
     </Flex>
-  </Header>
+  </MantineHeader>
 );
-export default GlobalNavBar;
+export default Header;
