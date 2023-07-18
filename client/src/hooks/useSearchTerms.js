@@ -19,7 +19,7 @@ const useSearchTerms = input => {
 
     if (cacheStore.has(queryKey)) {
       const cache = cacheStore.get(queryKey);
-      if (cache.createAt - Date.now() < cacheTime) {
+      if (Date.now() - cache.createAt < cacheTime) {
         setRecommended(cache.data);
         return;
       }
