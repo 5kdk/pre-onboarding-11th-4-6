@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import getSearchTerms from '../apis/sick';
+import textProcessing from '../utils/textProcessing';
 
 const cacheTime = 1 * 60 * 1000;
 const cacheStore = new Map();
@@ -9,13 +10,15 @@ const useSearchTerms = input => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const trimedInput = input.trim();
+  const processed = textProcessing(input);
 
   const updateRecommended = async input => {
     if (!input) return;
 
-    if (cacheStore.has(input)) {
-      const cache = cacheStore.get(input);
+    const queryKey = `@Suggestion ${input}`;
+
+    if (cacheStore.has(queryKey)) {
+      const cache = cacheStore.get(queryKey);
       if (cache.createAt - Date.now() < cacheTime) {
         setRecommended(cache.data);
         return;
@@ -27,7 +30,7 @@ const useSearchTerms = input => {
 
       const { data } = await getSearchTerms({ q: input });
 
-      cacheStore.set(input, { data, createAt: Date.now() });
+      cacheStore.set(queryKey, { data, createAt: Date.now() });
 
       setRecommended(data);
       console.log('cacheStore', cacheStore);
@@ -39,8 +42,8 @@ const useSearchTerms = input => {
   };
 
   useEffect(() => {
-    updateRecommended(trimedInput);
-  }, [trimedInput]);
+    updateRecommended(processed);
+  }, [processed]);
 
   return { recommended, isLoading, error };
 };
