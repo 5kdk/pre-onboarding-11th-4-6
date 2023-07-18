@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import getSearchTerms from '../apis/sick';
 
-const cacheTime = 5 * 60 * 1000;
+const cacheTime = 1 * 60 * 1000;
 const cacheStore = new Map();
 
-const useSearchTerms = userInput => {
+const useSearchTerms = input => {
   const [recommended, setRecommended] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const trimedInput = input.trim();
+
   const updateRecommended = async input => {
+    if (!input) return;
+
     if (cacheStore.has(input)) {
       const cache = cacheStore.get(input);
       if (cache.createAt - Date.now() < cacheTime) {
@@ -23,12 +27,10 @@ const useSearchTerms = userInput => {
 
       const { data } = await getSearchTerms({ q: input });
 
-      if (data.length !== 0) {
-        cacheStore.set(input, { data, createAt: Date.now() });
-        setRecommended(data);
-      } else {
-        setRecommended([]);
-      }
+      cacheStore.set(input, { data, createAt: Date.now() });
+
+      setRecommended(data);
+      console.log('cacheStore', cacheStore);
     } catch (e) {
       setError(e);
     } finally {
@@ -37,8 +39,8 @@ const useSearchTerms = userInput => {
   };
 
   useEffect(() => {
-    updateRecommended(userInput);
-  }, [userInput]);
+    updateRecommended(trimedInput);
+  }, [trimedInput]);
 
   return { recommended, isLoading, error };
 };
