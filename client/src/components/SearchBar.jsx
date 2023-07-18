@@ -1,14 +1,15 @@
 import { TextInput, ActionIcon, useMantineTheme, Box } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import Suggestion from './Suggestion';
-import { useCallback, useDeferredValue, useState } from 'react';
+import { useCallback, useState } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
+import useDebounceValue from '../hooks/useDebounceValue';
 
 const SearchBar = props => {
   const theme = useMantineTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [opened, setOpened] = useState(false);
-  const deferred = useDeferredValue(searchTerm);
+  const deferred = useDebounceValue(searchTerm);
 
   const ref = useClickOutside(useCallback(() => setOpened(false), []));
 
