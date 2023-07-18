@@ -9,6 +9,8 @@ const sickAxios = axios.create({
 const getSearchTerms = params => {
   const res = sickAxios.get('/sick', { params });
 
+  console.info('calling api');
+
   return res;
 };
 
