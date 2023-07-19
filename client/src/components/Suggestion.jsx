@@ -3,8 +3,9 @@ import { Box, List, Loader, Text } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { useRecommendedSearchTerms } from '../hooks';
 
-const Wrapper = ({ align, children }) => (
+const Wrapper = ({ align, children, onMouseEnter }) => (
   <Box
+    onMouseEnter={onMouseEnter}
     pos="absolute"
     w={490}
     mt="md"
@@ -49,6 +50,10 @@ const Suggestion = forwardRef(({ searchTerm }, ref) => {
     }
   };
 
+  const handleMouseIn = () => {
+    setSelectedIndex(-1);
+  };
+
   const updateScroll = useCallback(() => {
     if (listItemRefs.current[selectedIndex]) {
       listItemRefs.current[selectedIndex].scrollIntoView({
@@ -75,12 +80,16 @@ const Suggestion = forwardRef(({ searchTerm }, ref) => {
   }
 
   return (
-    <Wrapper>
+    <Wrapper onMouseEnter={handleMouseIn}>
       <Text size="sm" mb="md">
         {recommendations.length !== 0 ? '추천 검색어' : '검색어 없음'}
       </Text>
       <Box ref={ref} onKeyDown={handleKeyDown} mah={240} sx={() => ({ overflow: 'auto' })} tabIndex={0}>
-        <List sx={{ cursor: 'pointer' }} icon={<IconSearch size="1rem" color="lightgray" />}>
+        <List
+          sx={{
+            cursor: 'pointer',
+          }}
+          icon={<IconSearch size="1rem" color="lightgray" />}>
           {recommendations.map(({ sickCd, sickNm }, i) => (
             <List.Item
               key={sickCd}
