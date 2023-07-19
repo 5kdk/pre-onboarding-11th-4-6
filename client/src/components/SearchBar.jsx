@@ -10,7 +10,7 @@ const SearchBar = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [opened, setOpened] = useState(false);
   const deferred = useDebounceValue(textProcessing(searchTerm));
-  const ref = useClickOutside(useCallback(() => setOpened(prev => !prev), []));
+  const ref = useClickOutside(useCallback(() => setOpened(false), []));
   const focusRef = useRef();
 
   const focusSuggestion = e => {
