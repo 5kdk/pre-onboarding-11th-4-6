@@ -1,7 +1,7 @@
-import { Box, List, ScrollArea, Text } from '@mantine/core';
-import useSearchTerms from '../hooks/useSearchTerms';
-import { IconSearch } from '@tabler/icons-react';
 import { forwardRef } from 'react';
+import { Box, List, ScrollArea, Text } from '@mantine/core';
+import { IconSearch } from '@tabler/icons-react';
+import { useSearchTerms } from '../hooks';
 
 const Suggestion = forwardRef(({ searchTerm }, ref) => {
   const { recommended, isLoading, error } = useSearchTerms(searchTerm);

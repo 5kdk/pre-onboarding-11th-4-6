@@ -1,9 +1,8 @@
+import { useCallback, useState } from 'react';
 import { TextInput, ActionIcon, useMantineTheme, Box } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
-import Suggestion from './Suggestion';
-import { useCallback, useState } from 'react';
-import useClickOutside from '../hooks/useClickOutside';
-import useDebounceValue from '../hooks/useDebounceValue';
+import { useClickOutside, useDebounceValue } from '../hooks';
+import { Suggestion } from '.';
 
 const SearchBar = props => {
   const theme = useMantineTheme();

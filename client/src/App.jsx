@@ -1,6 +1,6 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { Root, Main } from './pages/';
 import { MantineProvider } from '@mantine/core';
+import { Root, Main } from './pages/';
 
 const router = createBrowserRouter([
   {
