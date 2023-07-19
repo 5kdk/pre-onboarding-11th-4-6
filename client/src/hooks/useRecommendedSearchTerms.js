@@ -1,17 +1,15 @@
+import { useCallback } from 'react';
 import { useCacheQuery } from '.';
 import getSearchTerms from '../apis/sick';
-import textProcessing from '../utils/textProcessing';
 
 const useRecommendedSearchTerms = input => {
-  const processedInput = textProcessing(input);
-
   const {
     data: recommendations,
     isLoading,
     error,
   } = useCacheQuery({
-    queryKey: `@Suggestion ${processedInput}`,
-    queryFn: () => getSearchTerms({ q: processedInput }),
+    queryKey: `@Suggestion ${input}`,
+    queryFn: useCallback(() => getSearchTerms(input), [input]),
     initialData: [],
     cacheTime: 2 * 60 * 1000,
   });
