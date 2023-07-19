@@ -55,7 +55,7 @@ const Suggestion = forwardRef(({ searchTerm }, ref) => {
       <Text size="sm" mb="md">
         {recommendations.length !== 0 ? '추천 검색어' : '검색어 없음'}
       </Text>
-      <ScrollArea h={300}>
+      <Box mah={240} sx={() => ({ overflow: 'auto' })}>
         <List spacing="sm" sx={{ cursor: 'pointer' }} icon={<IconSearch size="1rem" color="lightgray" />}>
           {recommendations.map(({ sickCd, sickNm }) => (
             <List.Item key={sickCd} tabIndex="0">
@@ -63,7 +63,7 @@ const Suggestion = forwardRef(({ searchTerm }, ref) => {
             </List.Item>
           ))}
         </List>
-      </ScrollArea>
+      </Box>
     </Wrapper>
   );
 });
