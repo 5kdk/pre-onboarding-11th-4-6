@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const initialCacheTime = 5 * 60 * 1000;
 const cacheStore = new Map();
@@ -8,7 +8,7 @@ const useCacheQuery = ({ queryKey, queryFn, initialData, cacheTime = initialCach
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchWithCache = async (queryKey, queryFn) => {
+  const fetchWithCache = useCallback(async (queryKey, queryFn, cacheTime) => {
     if (cacheStore.has(queryKey)) {
       const cache = cacheStore.get(queryKey);
       if (Date.now() - cache.createAt < cacheTime) {
@@ -27,12 +27,11 @@ const useCacheQuery = ({ queryKey, queryFn, initialData, cacheTime = initialCach
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchWithCache(queryKey, queryFn);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    fetchWithCache(queryKey, queryFn, cacheTime);
+  }, [cacheTime, fetchWithCache, queryFn, queryKey]);
 
   return { data, isLoading, error };
 };
