@@ -35,7 +35,7 @@ const SearchBar = props => {
         spellCheck="false"
         {...props}
       />
-      {searchTerm && opened && <Suggestion searchTerm={deferred} ref={ref} />}
+      {deferred && opened && <Suggestion searchTerm={deferred} ref={ref} />}
     </Box>
   );
 };
