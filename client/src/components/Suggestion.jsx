@@ -1,11 +1,10 @@
-import { forwardRef, Fragment } from 'react';
+import { forwardRef, Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Box, List, Loader, Text } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { useRecommendedSearchTerms } from '../hooks';
 
-const Wrapper = forwardRef(({ align, children }, ref) => (
+const Wrapper = ({ align, children }) => (
   <Box
-    ref={ref}
     pos="absolute"
     w={490}
     mt="md"
@@ -18,7 +17,7 @@ const Wrapper = forwardRef(({ align, children }, ref) => (
     })}>
     {children}
   </Box>
-));
+);
 
 const HighlightSearchTerm = ({ searchTerm, sickNm }) => {
   const regex = new RegExp(`(${searchTerm})`, 'gi');
@@ -36,29 +35,60 @@ const HighlightSearchTerm = ({ searchTerm, sickNm }) => {
 };
 
 const Suggestion = forwardRef(({ searchTerm }, ref) => {
-  const { recommendations, isLoading, error } = useRecommendedSearchTerms(searchTerm);
+  const { recommendations, isLoading, error } = useRecommendedSearchTerms(searchTerm, 15);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const listItemRefs = useRef([]);
+
+  const handleKeyDown = e => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prevIndex => (prevIndex >= 0 ? prevIndex - 1 : prevIndex));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prevIndex => (prevIndex < recommendations.length - 1 ? prevIndex + 1 : prevIndex));
+    }
+  };
+
+  const updateScroll = useCallback(() => {
+    if (listItemRefs.current[selectedIndex]) {
+      listItemRefs.current[selectedIndex].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    updateScroll();
+  }, [selectedIndex, updateScroll]);
 
   if (isLoading) {
     return (
-      <Wrapper ref={ref} align="center">
+      <Wrapper align="center">
         <Loader />
       </Wrapper>
     );
   }
 
   if (error) {
-    return <Wrapper ref={ref}>요청사항을 처리하는데 실패했습니다.</Wrapper>;
+    return <Wrapper>요청사항을 처리하는데 실패했습니다.</Wrapper>;
   }
 
   return (
-    <Wrapper ref={ref}>
+    <Wrapper>
       <Text size="sm" mb="md">
         {recommendations.length !== 0 ? '추천 검색어' : '검색어 없음'}
       </Text>
-      <Box mah={240} sx={() => ({ overflow: 'auto' })}>
-        <List spacing="sm" sx={{ cursor: 'pointer' }} icon={<IconSearch size="1rem" color="lightgray" />}>
-          {recommendations.map(({ sickCd, sickNm }) => (
-            <List.Item key={sickCd} tabIndex="0">
+      <Box ref={ref} onKeyDown={handleKeyDown} mah={240} sx={() => ({ overflow: 'auto' })} tabIndex={0}>
+        <List sx={{ cursor: 'pointer' }} icon={<IconSearch size="1rem" color="lightgray" />}>
+          {recommendations.map(({ sickCd, sickNm }, i) => (
+            <List.Item
+              key={sickCd}
+              ref={el => (listItemRefs.current[i] = el)}
+              bg={selectedIndex === i && '#CAE9FF'}
+              tabIndex={0}
+              p={7}
+              sx={() => ({ ':hover': { backgroundColor: '#CAE9FF' } })}>
               {HighlightSearchTerm({ sickNm, searchTerm })}
             </List.Item>
           ))}

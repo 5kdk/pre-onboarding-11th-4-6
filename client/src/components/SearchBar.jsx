@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { TextInput, ActionIcon, useMantineTheme, Box } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { useClickOutside, useDebounceValue } from '../hooks';
@@ -11,6 +11,14 @@ const SearchBar = () => {
   const [opened, setOpened] = useState(false);
   const deferred = useDebounceValue(textProcessing(searchTerm));
   const ref = useClickOutside(useCallback(() => setOpened(prev => !prev), []));
+  const focusRef = useRef();
+
+  const focusSuggestion = e => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusRef.current?.focus();
+    }
+  };
 
   const handleUserInput = e => {
     setSearchTerm(e.target.value);
@@ -18,9 +26,10 @@ const SearchBar = () => {
   };
 
   return (
-    <Box w={490} pos="relative">
+    <Box w={490} pos="relative" ref={ref}>
       <TextInput
         value={searchTerm}
+        onKeyDown={focusSuggestion}
         onChange={handleUserInput}
         icon={<IconSearch size="1.1rem" stroke={1.5} />}
         radius="xl"
@@ -34,7 +43,7 @@ const SearchBar = () => {
         aria-label="질환 검색창"
         spellCheck="false"
       />
-      {deferred && opened && <Suggestion searchTerm={deferred} ref={ref} />}
+      {deferred && opened && <Suggestion searchTerm={deferred} ref={focusRef} />}
     </Box>
   );
 };
