@@ -9,33 +9,42 @@
 ## 프로젝트 개요
 
 - 2023.07.16 ~ 2023.07.19
-- 원티드 프리온보딩 인턴십 기업 최종 과제
-- 개인 프로젝트
+- 원티드 프리온보딩 인턴십 최종 과제, 개인 프로젝트
+- [한국임상정보](https://clinicaltrialskorea.com/)의 검색영역 클론
+- [배포링크](https://pre-onboarding-11th-4-6.vercel.app/)
+- 프로젝트 테스트를 위해선 server 폴더에 있는 json server를 구동해야합니다.
+
+  ```
+  cd server
+
+  npm install
+  npm start
+  ```
 
 <br/>
 
 ## 구현 목표
 
-> 👀 검색창 구현 + 검색어 추천 기능 구현 + 캐싱 기능 구현
+> ### 👀 검색창 구현 + 검색어 추천 기능 구현 + 캐싱 기능 구현
 
-- 질환명 검색시 API 호출 통해서 <U>검색어 추천 기능 구현 </U>
-- API 호출별로 <U>로컬 캐싱 구현</U> _(캐싱 기능을 제공하는 라이브러리 사용 금지 !)_
-- <U>API 호출 횟수를 줄이는 전략</U> 수립 및 실행
-- 콘솔창에서 API <U>호출 횟수 확인</U>이 가능하도록 설정
-- <U>키보드만으로 추천 검색어들로 이동</U> 가능하도록 구현
+- 질환명 검색시 API 호출 통해서 검색어 추천 기능 구현
+- API 호출별로 로컬 캐싱 구현 _(캐싱 기능을 제공하는 라이브러리 사용 금지 !)_
+- API 호출 횟수를 줄이는 전략 수립 및 실행
+- 콘솔창에서 API 호출 횟수 확인이 가능하도록 설정
+- 키보드만으로 추천 검색어들로 이동 가능하도록 구현
 
 <br/>
 
-## 개발 조건 및 사용기술
+## 개발 조건 및 사용 기술
 
-- 아래 조건의 라이브러리만 사용
+- 개발 조건
 
   - 전역 상태 관리 툴(필수 사용 X, 필요 시 사용)
   - 스타일 관련 라이브러리(styled-components, emotion, UI kit, tailwind, antd 등)
   - HTTP Client(axios 등)
   - 라우팅 관련 라이브러리(react-router-dom)
 
-- 기술 선택
+- 사용 기술
 
   ![JavaScript](https://img.shields.io/badge/javascript-black.svg?style=for-the-badge&logo=javascript)
   ![React](https://img.shields.io/badge/react-black.svg?style=for-the-badge&logo=react)
@@ -49,3 +58,315 @@
 <br/>
 
 ## 구현 아이디어
+
+### 🤔 API 호출별로 로컬 캐싱 구현
+
+- 요구사항을 보고 처음 떠오른 전체 로직은 다음과 같았습니다.
+
+  1. 로컬에서 캐싱할 수 있는 객체 생성
+  2. fetch 요청을 할 수 있는 custom hook을 구현
+  3. custom hook이 cache들을 공유할 수 있도록 구현
+  4. cache time(expire time)을 data와 함께 저장
+
+- 이를 바탕으로 설계를 진행하고자 하였습니다.
+- 우선 cache는 key-value를 안전하게 관리할 수 있는 `Map` 객체를 선택했습니다.
+- key는 단 하나만 존재해야 하며, Map 객체를 컨트롤 할 수 있는 직관적인 프로토타입 메서드들을 제공(ex) `.has()`, `.set()`) 하므로 cache를 관리하기 적합하다 생각했습니다.
+
+  ```jsx
+  const cacheStore = new Map();
+  ```
+
+- 그리고 서버데이터를 캐싱을 통해 조건부로 GET 요청하는 가져오는 관심사를 캡슐화한 `useCacheQuery`를 구현하였습니다.
+
+  ```jsx
+  import { useCallback, useEffect, useState } from 'react';
+
+  const initialCacheTime = 5 * 60 * 1000;
+  const cacheStore = new Map();
+
+  const useCacheQuery = ({
+    queryKey,
+    queryFn,
+    initialData,
+    cacheTime = initialCacheTime,
+    select,
+  }) => {
+    const [data, setData] = useState(initialData);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    // ...
+
+    return { data, isLoading, error };
+  };
+
+  export default useCacheQuery;
+  ```
+
+- 캐시를 관리할 `cacheStore`은 이 커스텀 훅이 쓰이는 모든 컴포넌트에서 접근할 수 있도록 모듈 스코프에 선언하였습니다.
+- 데이터를 판별할 key 문자열 `queryKey`와 데이터를 요청하는 비동기 함수 `queryFn`는 외부에서 주입 받습니다.
+
+  ```jsx
+  // useCacheQuery 사용 예
+  const useRecommendedSearchTerms = input => {
+    const {
+      data: recommendations,
+      isLoading,
+      error,
+    } = useCacheQuery({
+      queryKey: `@Suggestion ${input}`,
+      queryFn: useCallback(() => getSearchTerms(input), [input]),
+      initialData: [],
+      select: useCallback(data => data.splice(0, 20), []),
+    });
+
+    // ...
+  };
+  ```
+
+- 데이터를 가져오는 `fetchWithCache`라는 함수에서 캐시 확인 조건들을 설정해주었습니다.
+
+  ```jsx
+  // ...
+  const fetchWithCache = useCallback(
+    async (queryKey, queryFn, cacheTime) => {
+      if (cacheStore.has(queryKey)) {
+        const cache = cacheStore.get(queryKey);
+        if (Date.now() - cache.createAt < cacheTime) {
+          setData(cache.data);
+          return;
+        }
+      }
+    // ...
+  ```
+
+  - 사용자의 요청이 들어오면 `cacheStore`에 `queryKey`가 있는지 확인합니다.
+  - 캐시에 해당 key가 존재한다면 value의 생성시간(ms)과 현재시간(ms)의 차이를 사용자가 주입한 `cacheTime`과 비교합니다.
+  - 만약 조건이 모두 만족된다면 캐시를 사용하여 상태를 업데이트하고 early `return` 처리합니다.
+
+- 유효한 캐시가 없을 경우 서버에 데이터 요청을 수행합니다.
+
+  ```jsx
+  // ...
+      try {
+        setIsLoading(true);
+        const { data } = await queryFn();
+        cacheStore.set(queryKey, { data, createAt: Date.now() });
+        setData(select ? select(data) : data);
+      } catch (e) {
+        setError(e);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [select]
+  );
+
+  //...
+  ```
+
+  - 사용자가 전달한 `queryFn`로 데이터를 받아오고 캐시에 생성시간(`createAt: Date.now()`)을 함께 저장합니다.
+  - 만약 `select` 콜백함수가 있다면 `data`를 `select` 함수로 가공하여 필요한 사용자가 데이터만 반환하도록 하였습니다.
+
+<details>
+<summary> 👀 전체 로직</summary>
+
+```jsx
+import { useCallback, useEffect, useState } from 'react';
+
+const initialCacheTime = 5 * 60 * 1000;
+const cacheStore = new Map();
+
+const useCacheQuery = ({
+  queryKey,
+  queryFn,
+  initialData,
+  cacheTime = initialCacheTime,
+  select,
+}) => {
+  const [data, setData] = useState(initialData);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchWithCache = useCallback(async () => {
+    if (cacheStore.has(queryKey)) {
+      const cache = cacheStore.get(queryKey);
+      if (Date.now() - cache.createAt < cacheTime) {
+        setData(cache.data);
+        return;
+      }
+    }
+
+    try {
+      setIsLoading(true);
+      const { data } = await queryFn();
+      cacheStore.set(queryKey, {
+        data: select ? select(data) : data,
+        createAt: Date.now(),
+      });
+      setData(select ? select(data) : data);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cacheTime, queryFn, queryKey, select]);
+
+  useEffect(() => {
+    fetchWithCache();
+  }, [fetchWithCache]);
+
+  return { data, isLoading, error };
+};
+
+export default useCacheQuery;
+```
+
+</details>
+
+- 요약하자면 `useCacheQuery`를 호출하면 `initialState`를 초기 상태로 저장하고
+  GET 요청하기 위한 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출해 캐시를 확인하며 필요시 서버에 데이터를 요청해 `select`로 가공하고 상태를 변경합니다. 결합도를 느슨하게 응집도는 최대한 높힐 수 있었습니다.
+
+- 구현하면서 아쉬운 점이 많이 남습니다.
+  - 다른 컴포넌트에게 상태 변경을 알리는 로직이 부족합니다. 이를 보완하기 위해 recoil의 `atomFamily`로 전역적으로 구현할 수 있었으나, 현재 프로젝트에서는 굳이 필요하지 않아 라이브러리를 추가하지 않았습니다. 후에 옵저버 패턴을 구현해서 상태 변경을 컴포넌트에게 알리는 로직을 추가 구현해보고자 합니다.
+  - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하기.
+  - 현재 캐시가 무한정 커지는 것을 방지하기 위한 적절한 캐시 정책이 없기에 메모리 누수가 발생할 수 있으며 이를 보완해야합니다.
+
+<br>
+
+---
+
+### 🤔 입력마다 API를 호출하지 않도록 호출 횟수를 줄이기
+
+- UI를 그리는 상태를 그대로 사용하게 되면 과도한 API 호출이 되기 때문에 지연된 상태를 만들기 위해 `useDebounceValue` 훅을 구현했습니다.
+- 내장 함수 setTimeout을 사용하여 delay 만큼 set함수의 타이머를 설정합니다.
+- 설정한 delay 시간보다 먼저 value가 들어온다면 `useEffect`의 cleanup 함수로 타이머가 제거가 됩니다.
+- 사용자의 입력이 delay 만큼 없다면 `debouncedValue`가 반환되어 사용할 수 있도록 구현하였습니다.
+- 반환된 `debouncedValue`는 하위 컴포넌트의 조건부 랜더링과, 하위 컴포넌트에 props로 전달되어 데이터 요청을 보내는데에 사용됩니다.
+
+  ```jsx
+  const useDebounceValue = (value, delay = 300) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }, [value, delay]);
+
+    return debouncedValue;
+  };
+  ```
+
+<br>
+
+---
+
+### 🤔 키보드만으로 추천 검색어들로 이동 가능하도록 구현
+
+- 먼저, `focusRef`를 자식 컴포넌트에 전달하여 input에서 아래 화살표 keydown 이벤트가 발생할 때 에도 추천검색어로 옮겨가도록 구현하였습니다.
+- `ref`로 참조하고 있는 요소에 `tabIndex` 옵션을 주어 `focus()` 가 작동하도록 구현했습니다.(도움주신 팀원분들 감사합니다 🥰)
+
+  ```jsx
+  // 부모컴포넌트 내부
+  const focusRef = useRef();
+
+  const focusSuggestion = e => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusRef.current?.focus();
+    }
+  };
+  ```
+
+- 자식컴포넌트 `Suggestion`에서는 `selectedIndex` 상태와 keydown 이벤트로 각각 추천검색어의 `index`와 `selectedIndex`를 비교하여 요소의 배경색을 변경했습니다.
+
+  ```jsx
+  const handleKeyDown = e => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prevIndex =>
+        prevIndex >= 0 ? prevIndex - 1 : prevIndex
+      );
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prevIndex =>
+        prevIndex < recommendations.length - 1 ? prevIndex + 1 : prevIndex
+      );
+    }
+  };
+  ```
+
+- 추천 검색어 목록을 스크롤이 허용되도록 구현했기 때문에 keydown 이벤트 발생시 스크롤이 현재 `selectIndex`와 다르게 움직이는 이슈가 있었습니다.
+- `useRef`로 배열 형태의 `ref`를 만들어 index로 `ref`에 인덱스마다 각각 추천검색어 요소를 참조할 수 있게하였고, `scrollIntoView` 메서드로 스크롤 오작동 문제를 해결할 수 있었습니다.
+- ex) `<List ref={el => (listItemRefs.current[i] = el)>`
+
+  ```jsx
+  const listItemRefs = useRef([]);
+
+  const updateScroll = useCallback(() => {
+    if (listItemRefs.current[selectedIndex]) {
+      listItemRefs.current[selectedIndex].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    updateScroll();
+  }, [selectedIndex, updateScroll]);
+  ```
+
+<br>
+
+## 💫 추가 디테일 구현
+
+- 서버 요청시에 불 필요한 데이터가 캐시에 저장되거나 중복된 데이터가 저장되는 것을 줄이기 위해서 `textProcessing` 유틸 함수로 사용자 input을 전처리 해주었습니다.
+
+  ```jsx
+  const textProcessing = text => {
+    const regex = /[ㄱ-ㅎㅏ-ㅣ]|[^\w\s가-힣A-Za-z0-9]/g;
+    return text.replace(regex, '').trim();
+  };
+
+  export default textProcessing;
+  ```
+
+- 추천검색어 mouseenter 이벤트에 아래 핸들러를 적용하여 `selectIndex`를 초기화하여 css hover와 중복 방지 처리를 해주었습니다.
+
+  ```jsx
+  const handleMouseIn = () => {
+    setSelectedIndex(-1);
+  };
+  ```
+
+- 추천 검색어 창이 닫히기 쉽도록 `useClickOutside` 훅을 구현했습니다.
+
+  ```jsx
+  const useClickOutside = handler => {
+    const ref = useRef();
+
+    useEffect(() => {
+      const listener = e => {
+        if (ref.current && !ref.current.contains(e.target)) {
+          handler();
+        }
+      };
+
+      document.addEventListener('mousedown', listener);
+
+      return () => {
+        document.removeEventListener('mousedown', listener);
+      };
+    }, [handler]);
+
+    return ref;
+  };
+  ```
+
+---
