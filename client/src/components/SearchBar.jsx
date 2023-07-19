@@ -5,7 +5,7 @@ import { useClickOutside, useDebounceValue } from '../hooks';
 import textProcessing from '../utils/textProcessing';
 import { Suggestion } from '.';
 
-const SearchBar = props => {
+const SearchBar = () => {
   const theme = useMantineTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [opened, setOpened] = useState(false);
@@ -33,7 +33,6 @@ const SearchBar = props => {
         placeholder="질환명을 입력해 주세요."
         aria-label="질환 검색창"
         spellCheck="false"
-        {...props}
       />
       {deferred && opened && <Suggestion searchTerm={deferred} ref={ref} />}
     </Box>
