@@ -1,5 +1,5 @@
 import { forwardRef, Fragment } from 'react';
-import { Box, List, Loader, ScrollArea, Text } from '@mantine/core';
+import { Box, List, Loader, Text } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { useRecommendedSearchTerms } from '../hooks';
 
