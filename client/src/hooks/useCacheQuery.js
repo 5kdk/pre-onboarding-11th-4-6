@@ -8,33 +8,30 @@ const useCacheQuery = ({ queryKey, queryFn, initialData, cacheTime = initialCach
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchWithCache = useCallback(
-    async (queryKey, queryFn, cacheTime) => {
-      if (cacheStore.has(queryKey)) {
-        const cache = cacheStore.get(queryKey);
-        if (Date.now() - cache.createAt < cacheTime) {
-          setData(cache.data);
-          return;
-        }
+  const fetchWithCache = useCallback(async () => {
+    if (cacheStore.has(queryKey)) {
+      const cache = cacheStore.get(queryKey);
+      if (Date.now() - cache.createAt < cacheTime) {
+        setData(cache.data);
+        return;
       }
+    }
 
-      try {
-        setIsLoading(true);
-        const { data } = await queryFn();
-        cacheStore.set(queryKey, { data, createAt: Date.now() });
-        setData(select ? select(data) : data);
-      } catch (e) {
-        setError(e);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [select],
-  );
+    try {
+      setIsLoading(true);
+      const { data } = await queryFn();
+      cacheStore.set(queryKey, { data: select ? select(data) : data, createAt: Date.now() });
+      setData(select ? select(data) : data);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cacheTime, queryFn, queryKey, select]);
 
   useEffect(() => {
-    fetchWithCache(queryKey, queryFn, cacheTime);
-  }, [cacheTime, fetchWithCache, queryFn, queryKey]);
+    fetchWithCache();
+  }, [fetchWithCache]);
 
   return { data, isLoading, error };
 };
