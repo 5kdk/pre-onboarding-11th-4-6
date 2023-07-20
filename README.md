@@ -76,7 +76,7 @@
   const cacheStore = new Map();
   ```
 
-- 그리고 서버데이터를 캐싱을 통해 조건부로 GET 요청하는 가져오는 관심사를 캡슐화한 `useCacheQuery`를 구현하였습니다.
+- 그리고 서버데이터를 캐싱을 통해 조건부로 비동기 데이터 요청하는 관심사를 캡슐화하여 `useCacheQuery`를 구현하였습니다.
 
   ```jsx
   import { useCallback, useEffect, useState } from 'react';
@@ -117,7 +117,7 @@
       queryKey: `@Suggestion ${input}`,
       queryFn: useCallback(() => getSearchTerms(input), [input]),
       initialData: [],
-      select: useCallback(data => data.splice(0, 20), []),
+      select: useCallback(data => data.slice(0, 20), []),
     });
 
     // ...
@@ -168,6 +168,40 @@
   - 사용자가 전달한 `queryFn`로 데이터를 받아오고 캐시에 생성시간(`createAt: Date.now()`)을 함께 저장합니다.
   - 만약 `select` 콜백함수가 있다면 `data`를 `select` 함수로 가공하여 필요한 사용자가 데이터만 반환하도록 하였습니다.
 
+- 메모리 누수 방지를 위한 로직을 추가적으로 구현하였습니다.
+
+  ```jsx
+  try {
+    // ...
+
+    if (cacheStore.size > maxCacheSize) {
+      const oldestCacheKey = cacheStore.keys().next().value;
+      cacheStore.delete(oldestCacheKey);
+    }
+    setData(select ? select(data) : data);
+  }
+  ```
+
+  - 캐시의 max size를 설정하고 데이터를 가져올때마다 확인하고 오래 사용되지 않은 캐시부터 제거합니다.
+  - `Map` 객체는 순서가 보장되므로 이를 활용할 수 있었습니다.
+  - 오래된 순서대로 캐시를 지워야하기 때문에 캐시를 사용할 때 캐시 시간이 연장되도록 기존의 캐시는 delete하고 새로 set 해주게끔 변경하였습니다.
+
+    ```jsx
+    if (cacheStore.has(queryKey)) {
+      const cache = cacheStore.get(queryKey);
+      if (Date.now() - cache.createAt < cacheTime) {
+        setData(cache.data);
+        cacheStore.delete(queryKey);
+        cacheStore.set(queryKey, cache);
+        return;
+      } else {
+        cacheStore.delete(queryKey);
+      }
+    }
+    ```
+
+  - 오래된 순서대로 캐시를 지워야하기 때문에 캐시를 사용할 때 캐시 시간이 연장되도록 기존의 캐시는 delete하고 새로 set 해주게끔 변경하였습니다.
+
 <details>
 <summary> 👀 전체 로직</summary>
 
@@ -176,6 +210,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 const initialCacheTime = 5 * 60 * 1000;
 const cacheStore = new Map();
+const maxCacheSize = 100;
 
 const useCacheQuery = ({
   queryKey,
@@ -193,7 +228,11 @@ const useCacheQuery = ({
       const cache = cacheStore.get(queryKey);
       if (Date.now() - cache.createAt < cacheTime) {
         setData(cache.data);
+        cacheStore.delete(queryKey);
+        cacheStore.set(queryKey, cache);
         return;
+      } else {
+        cacheStore.delete(queryKey);
       }
     }
 
@@ -204,6 +243,12 @@ const useCacheQuery = ({
         data: select ? select(data) : data,
         createAt: Date.now(),
       });
+
+      if (cacheStore.size > maxCacheSize) {
+        const oldestCacheKey = cacheStore.keys().next().value;
+        cacheStore.delete(oldestCacheKey);
+      }
+
       setData(select ? select(data) : data);
     } catch (e) {
       setError(e);
@@ -225,14 +270,12 @@ export default useCacheQuery;
 </details>
 
 - 요약하자면 `useCacheQuery`를 호출하면 `initialState`를 초기 상태로 저장하고
-  GET 요청하기 위한 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출해 캐시를 확인하며 필요시 서버에 데이터를 요청해 `select`로 가공하고 상태를 변경합니다. 결합도를 느슨하게 응집도는 최대한 높힐 수 있었습니다.
+  GET 요청하기 위한 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출해 캐시를 확인하며 필요시 서버에 데이터를 요청해 `select`로 가공하고 상태를 변경합니다. 의존성을 주입받아 범용성을 높힐 수 있었습니다.
 
-- 구현하면서 아쉬운 점이 많이 남습니다.
+- 구현 못다한 아쉬운 점
   - 다른 컴포넌트에게 상태 변경을 알리는 로직이 부족합니다. 이를 보완하기 위해 recoil의 `atomFamily`로 전역적으로 구현할 수 있었으나, 현재 프로젝트에서는 굳이 필요하지 않아 라이브러리를 추가하지 않았습니다. 후에 옵저버 패턴을 구현해서 상태 변경을 컴포넌트에게 알리는 로직을 추가 구현해보고자 합니다.
   - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하기.
-  - 현재 캐시가 무한정 커지는 것을 방지하기 위한 적절한 캐시 정책이 없기에 메모리 누수가 발생할 수 있으며 이를 보완해야합니다.
-
-<br>
+    <br>
 
 ---
 
@@ -369,4 +412,30 @@ export default useCacheQuery;
   };
   ```
 
+<br/>
+
 ---
+
+## 👾 버그 이슈
+
+- 캐시에 빈배열 `[]`이 들어가는 현상이 발견되었습니다. 원인을 조사한 결과 `select`를 급히 구현하다 `splice`메서드로 구현한 콜백함수를 `useCacheQuery`에 전달하면서 일어난 버그였습니다.
+
+  ```jsx
+  const {
+    data: recommendations,
+    isLoading,
+    error,
+  } = useCacheQuery({
+    queryKey: `@Suggestion ${input}`,
+    queryFn: useCallback(() => getSearchTerms(input), [input]),
+    initialData: [],
+    cacheTime: 2 * 60 * 1000,
+    select: useCallback(data => data.splice(0, 20), []),
+  });
+  ```
+
+- splice의 부수효과(side effect)로 인해 발생한 문제이기 때문에 `slice` 메서드로 대체하여 이를 해결하였습니다.
+
+  ```jsx
+  select: useCallback(data => data.slice(0, 20), []),
+  ```
