@@ -25,26 +25,26 @@ const useCacheQuery = ({ queryKey, queryFn, initialData, cacheTime = initialCach
     try {
       setIsLoading(true);
       const { data } = await queryFn();
-      cacheStore.set(queryKey, { data: select ? select(data) : data, createAt: Date.now() });
+      cacheStore.set(queryKey, { data, createAt: Date.now() });
 
       if (cacheStore.size > maxCacheSize) {
         const oldestCacheKey = cacheStore.keys().next().value;
         cacheStore.delete(oldestCacheKey);
       }
 
-      setData(select ? select(data) : data);
+      setData(data);
     } catch (e) {
       setError(e);
     } finally {
       setIsLoading(false);
     }
-  }, [cacheTime, queryFn, queryKey, select]);
+  }, [cacheTime, queryFn, queryKey]);
 
   useEffect(() => {
     fetchWithCache();
   }, [fetchWithCache]);
 
-  return { data, isLoading, error };
+  return { data: select ? select(data) : data, isLoading, error };
 };
 
 export default useCacheQuery;
