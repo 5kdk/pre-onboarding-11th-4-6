@@ -104,7 +104,7 @@
   ```
 
 - 캐시를 관리할 `cacheStore`은 이 커스텀 훅이 쓰이는 모든 컴포넌트에서 접근할 수 있도록 모듈 스코프에 선언하였습니다.
-- 데이터 캐시를 판별할 key 문자열 `queryKey`와 데이터를 요청하는 비동기 함수 `queryFn`는 외부에서 전달 받습니다.
+- 데이터 캐시를 판별할 key 문자열 `queryKey`와 데이터를 요청하는 비동기 함수 `queryFn`는 외부에서 전달 받습니다.(의존성 주입)
 
   ```jsx
   // useCacheQuery 사용 예
@@ -278,7 +278,7 @@ export default useCacheQuery;
 - 추후 보완하면 좋을 아이디어도 몇가지
 
   - 다른 컴포넌트에게 상태 변경을 알리는 로직이 부족합니다. 이를 보완하기 위해 recoil의 `atomFamily`로 전역적으로 구현할 수 있었으나, 현재 프로젝트에서는 굳이 필요하지 않아 라이브러리를 추가하지 않았습니다. 후에 옵저버 패턴을 구현해서 상태 변경을 컴포넌트에게 알리는 로직을 추가 구현해보고자 합니다.
-  - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하면 좋을 것 같습니다.
+  - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하면 좋을것 같습니다.
 
 <br>
 
@@ -338,7 +338,7 @@ export default useCacheQuery;
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prevIndex =>
-        prevIndex >= 0 ? prevIndex - 1 : prevIndex
+        prevIndex > 0 ? prevIndex - 1 : prevIndex
       );
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
