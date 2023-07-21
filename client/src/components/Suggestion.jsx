@@ -43,7 +43,7 @@ const Suggestion = forwardRef(({ searchTerm }, ref) => {
   const handleKeyDown = e => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex(prevIndex => (prevIndex >= 0 ? prevIndex - 1 : prevIndex));
+      setSelectedIndex(prevIndex => (prevIndex > 0 ? prevIndex - 1 : prevIndex));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prevIndex => (prevIndex < recommendations.length - 1 ? prevIndex + 1 : prevIndex));
