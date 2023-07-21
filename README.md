@@ -128,13 +128,16 @@
 
   ```jsx
   // ...
-  const fetchWithCache = useCallback(
-    async (queryKey, queryFn, cacheTime) => {
+  const fetchWithCache = useCallback(async () => {
       if (cacheStore.has(queryKey)) {
         const cache = cacheStore.get(queryKey);
         if (Date.now() - cache.createAt < cacheTime) {
           setData(cache.data);
+          cacheStore.delete(queryKey);
+          cacheStore.set(queryKey, cache);
           return;
+        } else {
+          cacheStore.delete(queryKey);
         }
       }
     // ...
@@ -159,7 +162,7 @@
         setIsLoading(false);
       }
     },
-    [select]
+    [cacheTime, queryFn, queryKey]
   );
 
   //...
@@ -270,9 +273,9 @@ export default useCacheQuery;
 </details>
 
 - 요약하자면 `useCacheQuery`를 호출하면 `initialState`를 초기 상태로 저장하고
-  GET 요청하기 위한 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출해 캐시를 확인하며 필요시 서버에 데이터를 요청해 `data` 상태를 업데이트하고 `select`여부에 따라 가공해서 반환하더나 그대로 반환합니다. 외부에서 의존성을 주입받아 범용성을 높힐 수 있게되었습니다.
+  비동기 함수 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출합니다. `useCacheQuery`에서는 로컬 캐시를 확인하고 관리하며 필요시 서버에 데이터를 요청해 `data`와 캐시를 업데이트합니다. `data`를 `select`여부에 따라 가공해서 반환하거나 그대로 반환합니다.
 
-- 구현 못다한 점
+- 추후 보완하면 좋을 아이디어도 몇가지
 
   - 다른 컴포넌트에게 상태 변경을 알리는 로직이 부족합니다. 이를 보완하기 위해 recoil의 `atomFamily`로 전역적으로 구현할 수 있었으나, 현재 프로젝트에서는 굳이 필요하지 않아 라이브러리를 추가하지 않았습니다. 후에 옵저버 패턴을 구현해서 상태 변경을 컴포넌트에게 알리는 로직을 추가 구현해보고자 합니다.
   - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하면 좋을 것 같습니다.
