@@ -61,22 +61,22 @@
 
 ### 🤔 API 호출별로 로컬 캐싱 구현
 
-- 요구사항을 보고 처음 떠오른 전체 로직은 다음과 같았습니다.
+- 요구사항을 보고 떠오른 컨셉은 다음과 같았습니다.
 
   1. 로컬에서 캐싱할 수 있는 객체 생성
   2. fetch 요청을 할 수 있는 custom hook을 구현
   3. custom hook이 cache들을 공유할 수 있도록 구현
   4. cache time(expire time)을 data와 함께 저장
 
-- 이를 바탕으로 설계를 진행하고자 하였습니다.
+- 핵심 컨셉 4가지를 바탕으로 설계를 진행하였습니다.
 - 우선 cache는 key-value를 안전하게 관리할 수 있는 `Map` 객체를 선택했습니다.
-- key는 단 하나만 존재해야 하며, Map 객체를 컨트롤 할 수 있는 직관적인 프로토타입 메서드들을 제공(ex) `.has()`, `.set()`) 하므로 cache를 관리하기 적합하다 생각했습니다.
+- key는 단 하나만 존재해야 하며, Map 객체를 컨트롤 할 수 있는 직관적인 프로토타입 메서드들을 제공(ex: `has()`, `set()` 등) 하므로 cache를 관리하기 적합했습니다.
 
   ```jsx
   const cacheStore = new Map();
   ```
 
-- 그리고 서버데이터를 캐싱을 통해 조건부로 GET 요청하는 가져오는 관심사를 캡슐화한 `useCacheQuery`를 구현하였습니다.
+- 그리고 서버데이터 캐싱을 통해 조건부로 GET 요청하는 로직을 캡슐화하여 `useCacheQuery`를 구현하였습니다.
 
   ```jsx
   import { useCallback, useEffect, useState } from 'react';
@@ -104,7 +104,7 @@
   ```
 
 - 캐시를 관리할 `cacheStore`은 이 커스텀 훅이 쓰이는 모든 컴포넌트에서 접근할 수 있도록 모듈 스코프에 선언하였습니다.
-- 데이터를 판별할 key 문자열 `queryKey`와 데이터를 요청하는 비동기 함수 `queryFn`는 외부에서 주입 받습니다.
+- 데이터 캐시를 판별할 key 문자열 `queryKey`와 데이터를 요청하는 비동기 함수 `queryFn`는 외부에서 전달 받습니다.(의존성 주입)
 
   ```jsx
   // useCacheQuery 사용 예
@@ -117,31 +117,34 @@
       queryKey: `@Suggestion ${input}`,
       queryFn: useCallback(() => getSearchTerms(input), [input]),
       initialData: [],
-      select: useCallback(data => data.splice(0, 20), []),
+      select: useCallback(data => data.slice(0, 20), []),
     });
 
     // ...
   };
   ```
 
-- 데이터를 가져오는 `fetchWithCache`라는 함수에서 캐시 확인 조건들을 설정해주었습니다.
+- `fetchWithCache`라는 함수에서 조건문을 통해 캐시를 확인하고 조건부로 데이터를 받도록 설정해주었습니다.
 
   ```jsx
   // ...
-  const fetchWithCache = useCallback(
-    async (queryKey, queryFn, cacheTime) => {
+  const fetchWithCache = useCallback(async () => {
       if (cacheStore.has(queryKey)) {
         const cache = cacheStore.get(queryKey);
         if (Date.now() - cache.createAt < cacheTime) {
           setData(cache.data);
+          cacheStore.delete(queryKey);
+          cacheStore.set(queryKey, cache);
           return;
+        } else {
+          cacheStore.delete(queryKey);
         }
       }
     // ...
   ```
 
   - 사용자의 요청이 들어오면 `cacheStore`에 `queryKey`가 있는지 확인합니다.
-  - 캐시에 해당 key가 존재한다면 value의 생성시간(ms)과 현재시간(ms)의 차이를 사용자가 주입한 `cacheTime`과 비교합니다.
+  - 캐시에 해당 key가 존재한다면 value의 생성시간(ms)과 현재시간(ms)의 차이를 `cacheTime`과 비교합니다.
   - 만약 조건이 모두 만족된다면 캐시를 사용하여 상태를 업데이트하고 early `return` 처리합니다.
 
 - 유효한 캐시가 없을 경우 서버에 데이터 요청을 수행합니다.
@@ -152,21 +155,58 @@
         setIsLoading(true);
         const { data } = await queryFn();
         cacheStore.set(queryKey, { data, createAt: Date.now() });
-        setData(select ? select(data) : data);
+        setData(data);
       } catch (e) {
         setError(e);
       } finally {
         setIsLoading(false);
       }
     },
-    [select]
+    [cacheTime, queryFn, queryKey]
   );
 
   //...
   ```
 
-  - 사용자가 전달한 `queryFn`로 데이터를 받아오고 캐시에 생성시간(`createAt: Date.now()`)을 함께 저장합니다.
-  - 만약 `select` 콜백함수가 있다면 `data`를 `select` 함수로 가공하여 필요한 사용자가 데이터만 반환하도록 하였습니다.
+  - 사용자가 전달한 `queryFn`로 데이터를 받아오고 캐시에는 데이터와 생성시간을 담은 객체로 저장합니다.
+
+- 만약 `select` 콜백함수가 있다면 `data`를 `select`로 가공하여 사용자가 필요한 데이터만 반환하도록 하였습니다.
+
+  ```jsx
+  return { data: select ? select(data) : data, isLoading, error };
+  ```
+
+- 메모리 누수 방지를 위한 로직을 추가적으로 구현하였습니다.
+
+  ```jsx
+  try {
+    // ...
+    if (cacheStore.size > maxCacheSize) {
+      const oldestCacheKey = cacheStore.keys().next().value;
+      cacheStore.delete(oldestCacheKey);
+    }
+    // ...
+  }
+  ```
+
+  - 캐시의 max size를 설정하고 데이터를 가져올때마다 확인하고 오래 사용되지 않은 캐시부터 제거합니다.
+  - `Map` 객체는 순서가 보장되므로 이를 활용할 수 있었습니다.
+
+    ```jsx
+    if (cacheStore.has(queryKey)) {
+      const cache = cacheStore.get(queryKey);
+      if (Date.now() - cache.createAt < cacheTime) {
+        setData(cache.data);
+        cacheStore.delete(queryKey);
+        cacheStore.set(queryKey, cache);
+        return;
+      } else {
+        cacheStore.delete(queryKey);
+      }
+    }
+    ```
+
+  - 오래된 순서대로 캐시를 지워야하기 때문에 캐시를 사용할 때 캐시 시간이 연장되도록 기존의 캐시를 delete하고 새로운 캐시를 set 해주게끔 변경하였습니다.
 
 <details>
 <summary> 👀 전체 로직</summary>
@@ -176,6 +216,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 const initialCacheTime = 5 * 60 * 1000;
 const cacheStore = new Map();
+const maxCacheSize = 100;
 
 const useCacheQuery = ({
   queryKey,
@@ -193,30 +234,37 @@ const useCacheQuery = ({
       const cache = cacheStore.get(queryKey);
       if (Date.now() - cache.createAt < cacheTime) {
         setData(cache.data);
+        cacheStore.delete(queryKey);
+        cacheStore.set(queryKey, cache);
         return;
+      } else {
+        cacheStore.delete(queryKey);
       }
     }
 
     try {
       setIsLoading(true);
       const { data } = await queryFn();
-      cacheStore.set(queryKey, {
-        data: select ? select(data) : data,
-        createAt: Date.now(),
-      });
-      setData(select ? select(data) : data);
+      cacheStore.set(queryKey, { data, createAt: Date.now() });
+
+      if (cacheStore.size > maxCacheSize) {
+        const oldestCacheKey = cacheStore.keys().next().value;
+        cacheStore.delete(oldestCacheKey);
+      }
+
+      setData(data);
     } catch (e) {
       setError(e);
     } finally {
       setIsLoading(false);
     }
-  }, [cacheTime, queryFn, queryKey, select]);
+  }, [cacheTime, queryFn, queryKey]);
 
   useEffect(() => {
     fetchWithCache();
   }, [fetchWithCache]);
 
-  return { data, isLoading, error };
+  return { data: select ? select(data) : data, isLoading, error };
 };
 
 export default useCacheQuery;
@@ -225,12 +273,12 @@ export default useCacheQuery;
 </details>
 
 - 요약하자면 `useCacheQuery`를 호출하면 `initialState`를 초기 상태로 저장하고
-  GET 요청하기 위한 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출해 캐시를 확인하며 필요시 서버에 데이터를 요청해 `select`로 가공하고 상태를 변경합니다. 결합도를 느슨하게 응집도는 최대한 높힐 수 있었습니다.
+  비동기 함수 `queryFn`을 래핑한 `useCacheQuery`를 `useEffect`에서 호출합니다. `useCacheQuery`에서는 로컬 캐시를 확인하고 관리하며 필요시 서버에 데이터를 요청해 `data`와 캐시를 업데이트합니다. `data`를 `select`여부에 따라 가공해서 반환하거나 그대로 반환합니다.
 
-- 구현하면서 아쉬운 점이 많이 남습니다.
+- 추후 보완하면 좋을 아이디어도 몇가지
+
   - 다른 컴포넌트에게 상태 변경을 알리는 로직이 부족합니다. 이를 보완하기 위해 recoil의 `atomFamily`로 전역적으로 구현할 수 있었으나, 현재 프로젝트에서는 굳이 필요하지 않아 라이브러리를 추가하지 않았습니다. 후에 옵저버 패턴을 구현해서 상태 변경을 컴포넌트에게 알리는 로직을 추가 구현해보고자 합니다.
-  - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하기.
-  - 현재 캐시가 무한정 커지는 것을 방지하기 위한 적절한 캐시 정책이 없기에 메모리 누수가 발생할 수 있으며 이를 보완해야합니다.
+  - 선언적으로 에러, 로딩처리를 할 수 있도록 `ErrorBoundary`와 `Suspence`를 지원하는 기능 추가하면 좋을것 같습니다.
 
 <br>
 
@@ -239,9 +287,9 @@ export default useCacheQuery;
 ### 🤔 입력마다 API를 호출하지 않도록 호출 횟수를 줄이기
 
 - UI를 그리는 상태를 그대로 사용하게 되면 과도한 API 호출이 되기 때문에 지연된 상태를 만들기 위해 `useDebounceValue` 훅을 구현했습니다.
-- 내장 함수 setTimeout을 사용하여 delay 만큼 set함수의 타이머를 설정합니다.
-- 설정한 delay 시간보다 먼저 value가 들어온다면 `useEffect`의 cleanup 함수로 타이머가 제거가 됩니다.
-- 사용자의 입력이 delay 만큼 없다면 `debouncedValue`가 반환되어 사용할 수 있도록 구현하였습니다.
+- 내장 함수 setTimeout을 사용하여 delay 만큼 `debouncedValue`상태의 set 함수의 타이머를 설정합니다.
+- 설정한 delay 시간보다 먼저 value가 변경된다면 `useEffect`의 cleanup 함수로 타이머가 제거가 됩니다.
+- 즉, 사용자의 입력이 delay 만큼 없다면 `debouncedValue`가 반환되어 사용할 수 있도록 구현하였습니다.
 - 반환된 `debouncedValue`는 하위 컴포넌트의 조건부 랜더링과, 하위 컴포넌트에 props로 전달되어 데이터 요청을 보내는데에 사용됩니다.
 
   ```jsx
@@ -290,7 +338,7 @@ export default useCacheQuery;
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prevIndex =>
-        prevIndex >= 0 ? prevIndex - 1 : prevIndex
+        prevIndex > 0 ? prevIndex - 1 : prevIndex
       );
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -369,4 +417,30 @@ export default useCacheQuery;
   };
   ```
 
+<br/>
+
 ---
+
+## 👾 버그 이슈
+
+- 캐시에 빈배열 `[]`이 들어가는 현상이 발견되었습니다. 원인을 조사한 결과 `select`를 급히 구현하다 `splice`메서드로 구현한 콜백함수를 `useCacheQuery`에 전달하면서 일어난 버그였습니다.
+
+  ```jsx
+  const {
+    data: recommendations,
+    isLoading,
+    error,
+  } = useCacheQuery({
+    queryKey: `@Suggestion ${input}`,
+    queryFn: useCallback(() => getSearchTerms(input), [input]),
+    initialData: [],
+    cacheTime: 2 * 60 * 1000,
+    select: useCallback(data => data.splice(0, 20), []),
+  });
+  ```
+
+- splice의 부수효과(side effect)로 인해 발생한 문제이기 때문에 `slice` 메서드로 대체하여 이를 해결하였습니다.
+
+  ```jsx
+  select: useCallback(data => data.slice(0, 20), []),
+  ```

@@ -12,7 +12,7 @@ const useRecommendedSearchTerms = input => {
     queryFn: useCallback(() => getSearchTerms(input), [input]),
     initialData: [],
     cacheTime: 2 * 60 * 1000,
-    select: useCallback(data => data.splice(0, 20), []),
+    select: useCallback(data => data.slice(0, 20), []),
   });
 
   return { recommendations, isLoading, error };
